@@ -1,30 +1,36 @@
-"use client"
+"use client";
 
-import * as React from "react"
+import * as React from "react";
 import {
   AudioWaveform,
-  BookOpen,
-  Bot,
   Command,
-  Frame,
   GalleryVerticalEnd,
-  Map,
-  PieChart,
-  Settings2,
-  SquareTerminal,
-} from "lucide-react"
+  LayoutDashboardIcon,
+  BarChart3,
+  BrainCircuit,
+  Calendar,
+  CheckSquare,
+  ClipboardList,
+  Clock,
+  FileText,
+  Goal,
+  Timer,
+  Users,
+} from "lucide-react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
 
-import { NavMain } from "@/components/nav-main"
-import { NavProjects } from "@/components/nav-projects"
-import { NavUser } from "@/components/nav-user"
-import { TeamSwitcher } from "@/components/team-switcher"
+import { NavMain } from "@/components/nav-main";
+import { NavProjects } from "@/components/nav-projects";
+import { NavUser } from "@/components/nav-user";
+import { TeamSwitcher } from "@/components/team-switcher";
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
   SidebarHeader,
   SidebarRail,
-} from "@/components/ui/sidebar"
+} from "@/components/ui/sidebar";
 
 // This is sample data.
 const data = {
@@ -52,126 +58,99 @@ const data = {
   ],
   navMain: [
     {
-      title: "Playground",
-      url: "#",
-      icon: SquareTerminal,
-      isActive: true,
-      items: [
-        {
-          title: "History",
-          url: "#",
-        },
-        {
-          title: "Starred",
-          url: "#",
-        },
-        {
-          title: "Settings",
-          url: "#",
-        },
-      ],
+      title: "Dashboard",
+      icon: LayoutDashboardIcon,
+      href: "/dashboard",
     },
     {
-      title: "Models",
-      url: "#",
-      icon: Bot,
-      items: [
-        {
-          title: "Genesis",
-          url: "#",
-        },
-        {
-          title: "Explorer",
-          url: "#",
-        },
-        {
-          title: "Quantum",
-          url: "#",
-        },
-      ],
+      title: "To-Do List",
+      icon: CheckSquare,
+      href: "/todos",
     },
     {
-      title: "Documentation",
-      url: "#",
-      icon: BookOpen,
-      items: [
-        {
-          title: "Introduction",
-          url: "#",
-        },
-        {
-          title: "Get Started",
-          url: "#",
-        },
-        {
-          title: "Tutorials",
-          url: "#",
-        },
-        {
-          title: "Changelog",
-          url: "#",
-        },
-      ],
+      title: "Habit Tracker",
+      icon: BarChart3,
+      href: "/habits",
     },
     {
-      title: "Settings",
-      url: "#",
-      icon: Settings2,
-      items: [
-        {
-          title: "General",
-          url: "#",
-        },
-        {
-          title: "Team",
-          url: "#",
-        },
-        {
-          title: "Billing",
-          url: "#",
-        },
-        {
-          title: "Limits",
-          url: "#",
-        },
-      ],
+      title: "Time Management",
+      icon: Clock,
+      href: "/time",
+    },
+    {
+      title: "Pomodoro Timer",
+      icon: Timer,
+      href: "/pomodoro",
+    },
+    {
+      title: "Projects",
+      icon: ClipboardList,
+      href: "/projects",
+    },
+    {
+      title: "Notes",
+      icon: FileText,
+      href: "/notes",
+    },
+    {
+      title: "Goals",
+      icon: Goal,
+      href: "/goals",
+    },
+    {
+      title: "Team",
+      icon: Users,
+      href: "/team",
+    },
+    {
+      title: "Mind Maps",
+      icon: BrainCircuit,
+      href: "/mindmaps",
+    },
+    {
+      title: "Daily Planner",
+      icon: Calendar,
+      href: "/planner",
     },
   ],
-  projects: [
-    {
-      name: "Design Engineering",
-      url: "#",
-      icon: Frame,
-    },
-    {
-      name: "Sales & Marketing",
-      url: "#",
-      icon: PieChart,
-    },
-    {
-      name: "Travel",
-      url: "#",
-      icon: Map,
-    },
-  ],
+  projects: [],
+};
+
+function UpdatedNavMain({ items }) {
+  const router = useRouter();
+
+  return (
+    <div className="grid gap-1">
+      <nav className="grid gap-1 mx-4">
+        {items?.map((item, index) => (
+          <Link
+            key={index}
+            href={item.href}
+            className="flex items-center gap-3 rounded-lg px-3 py-2 text-gray-800 transition-all hover:text-foreground hover:bg-muted"
+          >
+            <item.icon className="h-4 w-4" />
+            <span>{item.title}</span>
+          </Link>
+        ))}
+      </nav>
+    </div>
+  );
 }
 
-export function AppSidebar({
-  ...props
-}) {
+export function AppSidebar({ ...props }) {
   return (
-    (<Sidebar collapsible="icon" {...props}>
+    <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
         <TeamSwitcher teams={data.teams} />
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={data.navMain} />
-        <NavProjects projects={data.projects} />
+        <UpdatedNavMain items={data.navMain} />
+        {/* <NavProjects projects={data.projects} /> */}
       </SidebarContent>
       <SidebarFooter>
         <NavUser user={data.user} />
       </SidebarFooter>
       <SidebarRail />
-    </Sidebar>)
+    </Sidebar>
   );
 }

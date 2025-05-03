@@ -111,15 +111,21 @@ export default function Page() {
               <h1 className="text-2xl ml-3 mt-3 font-bold">Dashboard</h1>
               <p className="ml-3">Your productivity command center</p>
             </div>
-            <div className="flex flex-col">
-              <Button variant="outline" size="sm">
-                <p onClick={handleCalender} ref={buttonRef}>
-                  {currentDate}
-                </p>
+            <div className="relative">
+              <Button
+                variant="outline"
+                size="sm"
+                ref={buttonRef}
+                onClick={handleCalender}
+              >
+                {currentDate}
               </Button>
               {calendar && (
-                <div ref={calendarRef}>
-                  <Calendar mode="single" className="rounded-md border" />
+                <div ref={calendarRef} className="absolute right-0 mt-2 z-50">
+                  <Calendar
+                    mode="single"
+                    className="rounded-md border bg-white shadow-lg"
+                  />
                 </div>
               )}
             </div>
