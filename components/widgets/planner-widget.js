@@ -16,7 +16,7 @@ export function PlannerWidget() {
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <div className="space-y-1">
           <CardTitle className="text-base">Daily Planner</CardTitle>
-          <CardDescription>Today's schedule</CardDescription>
+          <CardDescription>Today schedule</CardDescription>
         </div>
         <Calendar className="h-4 w-4 text-muted-foreground" />
       </CardHeader>

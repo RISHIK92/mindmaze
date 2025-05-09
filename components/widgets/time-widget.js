@@ -16,7 +16,7 @@ export function TimeWidget() {
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <div className="space-y-1">
           <CardTitle className="text-base">Time Management</CardTitle>
-          <CardDescription>Today's time allocation</CardDescription>
+          <CardDescription>Today time allocation</CardDescription>
         </div>
         <Clock className="h-4 w-4 text-muted-foreground" />
       </CardHeader>
