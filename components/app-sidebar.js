@@ -105,7 +105,7 @@ const data = {
     {
       title: "Mind Maps",
       icon: BrainCircuit,
-      href: "/mindmaps",
+      href: "/maze",
     },
     {
       title: "Daily Planner",

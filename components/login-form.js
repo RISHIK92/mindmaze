@@ -1,3 +1,5 @@
+"use client";
+
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -9,8 +11,10 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useRouter } from "next/navigation";
 
 export function LoginForm({ className, ...props }) {
+  const router = useRouter();
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card>
@@ -44,7 +48,10 @@ export function LoginForm({ className, ...props }) {
                 </div>
                 <Input id="password" type="password" required />
               </div>
-              <div className="flex flex-col gap-3">
+              <div
+                className="flex flex-col gap-3"
+                onClick={() => router.push("/dashboard")}
+              >
                 <Button type="submit" className="w-full">
                   Login
                 </Button>
