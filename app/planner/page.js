@@ -158,7 +158,7 @@ export default function PlannerPage() {
                 <CardTitle>
                   <span className="flex items-center gap-2">
                     <ListChecks className="h-5 w-5 text-muted-foreground" />
-                    Today's Tasks
+                    Todays Tasks
                   </span>
                 </CardTitle>
               </CardHeader>
