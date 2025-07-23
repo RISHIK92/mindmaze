@@ -68,11 +68,6 @@ const data = {
       href: "/todos",
     },
     {
-      title: "Habit Tracker",
-      icon: BarChart3,
-      href: "/habits",
-    },
-    {
       title: "Time Management",
       icon: Clock,
       href: "/time",
@@ -98,19 +93,9 @@ const data = {
       href: "/goals",
     },
     {
-      title: "Team",
-      icon: Users,
-      href: "/team",
-    },
-    {
       title: "Mind Maps",
       icon: BrainCircuit,
       href: "/maze",
-    },
-    {
-      title: "Daily Planner",
-      icon: Calendar,
-      href: "/planner",
     },
   ],
   projects: [],

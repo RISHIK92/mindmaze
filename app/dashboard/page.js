@@ -35,15 +35,13 @@ import {
   BrainCircuit,
 } from "lucide-react";
 import { TodoWidget } from "@/components/widgets/todo-widget";
-import { HabitWidget } from "@/components/widgets/habit-widget";
 import { TimeWidget } from "@/components/widgets/time-widget";
 import { PomodoroWidget } from "@/components/widgets/pomodoro-widget";
 import { ProjectWidget } from "@/components/widgets/project-widget";
 import { GoalWidget } from "@/components/widgets/goal-widget";
-import { TeamWidget } from "@/components/widgets/team-widget";
 import { PlannerWidget } from "@/components/widgets/planner-widget";
 
-export default function Page() {
+export default function DashboardPage() {
   const [calendar, setCalendar] = useState(false);
   const [currentDate, setCurrentDate] = useState("");
   const calendarRef = useRef(null);
@@ -212,7 +210,6 @@ export default function Page() {
               <TabsContent value="productivity" className="space-y-4">
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                   <TodoWidget />
-                  <HabitWidget />
                   <TimeWidget />
                   <PomodoroWidget />
                   <ProjectWidget />
@@ -228,7 +225,6 @@ export default function Page() {
               </TabsContent>
               <TabsContent value="collaboration" className="space-y-4">
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  <TeamWidget />
                   <ProjectWidget />
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
