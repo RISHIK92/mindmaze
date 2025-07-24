@@ -42,7 +42,7 @@ export function TimeWidget({ data = [] }) {
     <Card className="rounded-2xl shadow-md">
       <CardHeader className="flex flex-row items-center justify-between pb-1">
         <CardTitle className="text-base font-semibold text-muted-foreground">
-          Today's Tasks
+          Todays Tasks
         </CardTitle>
         <Clock className="h-4 w-4 text-muted-foreground" />
       </CardHeader>
