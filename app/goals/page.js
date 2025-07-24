@@ -176,7 +176,6 @@ export default function GoalsPage() {
     }
   };
 
-  // Delete goal in backend
   const handleDeleteGoal = async (idx) => {
     const goal = goals[idx];
     const idToken = await getIdToken();

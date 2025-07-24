@@ -6,7 +6,6 @@ import {
   Command,
   GalleryVerticalEnd,
   LayoutDashboardIcon,
-  BarChart3,
   BrainCircuit,
   Calendar,
   CheckSquare,
@@ -15,13 +14,9 @@ import {
   FileText,
   Goal,
   Timer,
-  Users,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-
-import { NavMain } from "@/components/nav-main";
-import { NavProjects } from "@/components/nav-projects";
 import { NavUser } from "@/components/nav-user";
 import { TeamSwitcher } from "@/components/team-switcher";
 import {
@@ -31,6 +26,8 @@ import {
   SidebarHeader,
   SidebarRail,
 } from "@/components/ui/sidebar";
+import { useEffect, useState } from "react";
+import { auth } from "@/lib/firebase";
 
 // This is sample data.
 const data = {
@@ -41,19 +38,7 @@ const data = {
   },
   teams: [
     {
-      name: "Acme Inc",
-      logo: GalleryVerticalEnd,
-      plan: "Enterprise",
-    },
-    {
-      name: "Acme Corp.",
-      logo: AudioWaveform,
-      plan: "Startup",
-    },
-    {
-      name: "Evil Corp.",
-      logo: Command,
-      plan: "Free",
+      name: "Personal Management",
     },
   ],
   navMain: [
@@ -68,9 +53,9 @@ const data = {
       href: "/todos",
     },
     {
-      title: "Time Management",
+      title: "Task Management",
       icon: Clock,
-      href: "/time",
+      href: "/task",
     },
     {
       title: "Pomodoro Timer",
@@ -91,6 +76,11 @@ const data = {
       title: "Goals",
       icon: Goal,
       href: "/goals",
+    },
+    {
+      title: "Daily Planner",
+      icon: Calendar,
+      href: "/planner",
     },
     {
       title: "Mind Maps",
@@ -123,6 +113,23 @@ function UpdatedNavMain({ items }) {
 }
 
 export function AppSidebar({ ...props }) {
+  const [userEmail, setUserEmail] = useState("");
+  const [userName, setUserName] = useState("shadcn");
+
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged((firebaseUser) => {
+      setUserEmail(firebaseUser?.email || "m@example.com");
+      setUserName(firebaseUser?.displayName || "shadcn");
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const sidebarUser = {
+    ...data.user,
+    name: userName,
+    email: userEmail,
+  };
+
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
@@ -130,10 +137,9 @@ export function AppSidebar({ ...props }) {
       </SidebarHeader>
       <SidebarContent>
         <UpdatedNavMain items={data.navMain} />
-        {/* <NavProjects projects={data.projects} /> */}
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={data.user} />
+        <NavUser user={sidebarUser} />
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>

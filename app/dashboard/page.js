@@ -4,7 +4,6 @@ import { AppSidebar } from "@/components/app-sidebar";
 import {
   Breadcrumb,
   BreadcrumbItem,
-  BreadcrumbLink,
   BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
@@ -33,6 +32,7 @@ import {
   Clock,
   FileText,
   BrainCircuit,
+  Loader2,
 } from "lucide-react";
 import { TodoWidget } from "@/components/widgets/todo-widget";
 import { TimeWidget } from "@/components/widgets/time-widget";
@@ -40,15 +40,86 @@ import { PomodoroWidget } from "@/components/widgets/pomodoro-widget";
 import { ProjectWidget } from "@/components/widgets/project-widget";
 import { GoalWidget } from "@/components/widgets/goal-widget";
 import { PlannerWidget } from "@/components/widgets/planner-widget";
+import { BACKEND_URL } from "../config";
+import { auth } from "@/lib/firebase";
+import { onAuthStateChanged } from "firebase/auth";
 
 export default function DashboardPage() {
   const [calendar, setCalendar] = useState(false);
   const [currentDate, setCurrentDate] = useState("");
+  const [dashboardData, setDashboardData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [user, setUser] = useState(null);
   const calendarRef = useRef(null);
   const buttonRef = useRef(null);
 
   const handleCalender = () => {
     setCalendar((e) => !e);
+  };
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      setUser(firebaseUser);
+      if (firebaseUser) {
+        const token = await firebaseUser.getIdToken();
+        fetchDashboardData(token);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const getAuthToken = async () => {
+    try {
+      if (user) {
+        return await user.getIdToken();
+      }
+      return null;
+    } catch (error) {
+      console.error("Error getting auth token:", error);
+      return null;
+    }
+  };
+
+  const fetchDashboardData = async (token) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      if (!token) {
+        token = await getAuthToken();
+        if (!token) {
+          setLoading(false);
+          setError("User not authenticated");
+          return;
+        }
+      }
+
+      const response = await fetch(`${BACKEND_URL}/dashboard`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      if (result.success) {
+        setDashboardData(result.data);
+      } else {
+        throw new Error(result.message || "Failed to fetch dashboard data");
+      }
+    } catch (error) {
+      console.error("Error fetching dashboard data:", error);
+      setError(error.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -81,6 +152,50 @@ export default function DashboardPage() {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [calendar]);
+
+  const getProjectStatusColor = (onTrack, atRisk, delayed) => {
+    if (onTrack > 0) return "bg-green-500";
+    if (atRisk > 0) return "bg-amber-500";
+    if (delayed > 0) return "bg-red-500";
+    return "bg-gray-500";
+  };
+
+  if (loading) {
+    return (
+      <SidebarProvider>
+        <AppSidebar />
+        <SidebarInset>
+          <div className="flex items-center justify-center h-screen">
+            <Loader2 className="h-8 w-8 animate-spin" />
+            <span className="ml-2">Loading dashboard...</span>
+          </div>
+        </SidebarInset>
+      </SidebarProvider>
+    );
+  }
+
+  if (error) {
+    return (
+      <SidebarProvider>
+        <AppSidebar />
+        <SidebarInset>
+          <div className="flex items-center justify-center h-screen">
+            <div className="text-center">
+              <p className="text-red-500 mb-4">
+                Error loading dashboard: {error}
+              </p>
+              <Button onClick={fetchDashboardData}>Retry</Button>
+            </div>
+          </div>
+        </SidebarInset>
+      </SidebarProvider>
+    );
+  }
+
+  const stats = dashboardData?.stats || {};
+  const widgets = dashboardData?.widgets || {};
+
+  console.log(stats, widgets);
 
   return (
     <SidebarProvider>
@@ -138,43 +253,17 @@ export default function DashboardPage() {
                   <CheckSquare className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">12/20</div>
-                  <Progress value={60} className="mt-2 h-1" />
+                  <div className="text-2xl font-bold">
+                    {stats.tasksCompleted?.current || 0}/
+                    {stats.tasksCompleted?.total || 0}
+                  </div>
+                  <Progress
+                    value={stats.tasksCompleted?.progress || 0}
+                    className="mt-2 h-1"
+                  />
                 </CardContent>
-                <CardFooter className="text-xs text-muted-foreground">
-                  +8% from yesterday
-                </CardFooter>
               </Card>
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium">
-                    Habits Tracked
-                  </CardTitle>
-                  <BarChart3 className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">5/7</div>
-                  <Progress value={71} className="mt-2 h-1" />
-                </CardContent>
-                <CardFooter className="text-xs text-muted-foreground">
-                  On track for weekly goal
-                </CardFooter>
-              </Card>
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium">
-                    Focus Time
-                  </CardTitle>
-                  <Clock className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">3h 45m</div>
-                  <Progress value={75} className="mt-2 h-1" />
-                </CardContent>
-                <CardFooter className="text-xs text-muted-foreground">
-                  75% of daily goal
-                </CardFooter>
-              </Card>
+
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <CardTitle className="text-sm font-medium">
@@ -183,18 +272,20 @@ export default function DashboardPage() {
                   <FileText className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">4</div>
+                  <div className="text-2xl font-bold">
+                    {stats.projects?.total || 0}
+                  </div>
                   <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
                     <div className="h-1.5 w-1.5 rounded-full bg-green-500"></div>
-                    <span>2 on track</span>
+                    <span>{stats.projects?.onTrack || 0} on track</span>
                     <div className="ml-2 h-1.5 w-1.5 rounded-full bg-amber-500"></div>
-                    <span>1 at risk</span>
+                    <span>{stats.projects?.atRisk || 0} at risk</span>
                     <div className="ml-2 h-1.5 w-1.5 rounded-full bg-red-500"></div>
-                    <span>1 delayed</span>
+                    <span>{stats.projects?.delayed || 0} delayed</span>
                   </div>
                 </CardContent>
                 <CardFooter className="text-xs text-muted-foreground">
-                  1 due this week
+                  {stats.projects?.dueThisWeek || 0} due this week
                 </CardFooter>
               </Card>
             </div>
@@ -204,61 +295,55 @@ export default function DashboardPage() {
                 <TabsList>
                   <TabsTrigger value="productivity">Productivity</TabsTrigger>
                   <TabsTrigger value="planning">Planning</TabsTrigger>
-                  <TabsTrigger value="collaboration">Collaboration</TabsTrigger>
                 </TabsList>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={fetchDashboardData}
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    "Refresh"
+                  )}
+                </Button>
               </div>
               <TabsContent value="productivity" className="space-y-4">
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  <TodoWidget />
-                  <TimeWidget />
+                  <TodoWidget
+                    data={widgets.todos}
+                    onUpdate={fetchDashboardData}
+                  />
+                  <TimeWidget
+                    data={widgets.timeEntries}
+                    onUpdate={fetchDashboardData}
+                  />
                   <PomodoroWidget />
-                  <ProjectWidget />
-                  <GoalWidget />
+                  <ProjectWidget
+                    data={widgets.projects}
+                    onUpdate={fetchDashboardData}
+                  />
+                  <GoalWidget
+                    data={widgets.goals}
+                    onUpdate={fetchDashboardData}
+                  />
                 </div>
               </TabsContent>
               <TabsContent value="planning" className="space-y-4">
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  <PlannerWidget />
-                  <GoalWidget />
-                  <ProjectWidget />
-                </div>
-              </TabsContent>
-              <TabsContent value="collaboration" className="space-y-4">
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  <ProjectWidget />
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                      <CardTitle className="text-sm font-medium">
-                        Mind Maps
-                      </CardTitle>
-                      <BrainCircuit className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div className="text-sm">Project Brainstorm</div>
-                        <div className="text-xs text-muted-foreground">
-                          Updated 2h ago
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <div className="text-sm">Marketing Strategy</div>
-                        <div className="text-xs text-muted-foreground">
-                          Updated 1d ago
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <div className="text-sm">Product Roadmap</div>
-                        <div className="text-xs text-muted-foreground">
-                          Updated 3d ago
-                        </div>
-                      </div>
-                    </CardContent>
-                    <CardFooter>
-                      <div className="text-xs text-muted-foreground">
-                        3 shared maps
-                      </div>
-                    </CardFooter>
-                  </Card>
+                  <PlannerWidget
+                    data={widgets.planner}
+                    onUpdate={fetchDashboardData}
+                  />
+                  <GoalWidget
+                    data={widgets.goals}
+                    onUpdate={fetchDashboardData}
+                  />
+                  <ProjectWidget
+                    data={widgets.projects}
+                    onUpdate={fetchDashboardData}
+                  />
                 </div>
               </TabsContent>
             </Tabs>

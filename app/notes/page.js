@@ -73,7 +73,7 @@ export default function NotesPage() {
 
       try {
         const idToken = await user.getIdToken();
-        const res = await fetch(`${API_BASE}/?page=1&limit=1000`, {
+        const res = await fetch(`${API_BASE}`, {
           headers: {
             Authorization: `Bearer ${idToken}`,
           },

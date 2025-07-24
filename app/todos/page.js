@@ -112,7 +112,6 @@ export default function TodosPage() {
 
         if (res.ok) {
           const data = await res.json();
-          // Ensure data is an array
           setTodos(Array.isArray(data) ? data : []);
         } else {
           setTodos([]);
@@ -187,7 +186,6 @@ export default function TodosPage() {
     }
   };
 
-  // Delete todo
   const handleDeleteTodo = async (id) => {
     try {
       const idToken = await getIdToken();

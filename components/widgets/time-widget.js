@@ -1,59 +1,99 @@
+"use client";
+
 import {
   Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
+  CardContent,
+  CardFooter,
 } from "@/components/ui/card";
-import { Clock } from "lucide-react";
+import { Clock, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import clsx from "clsx";
 
-export function TimeWidget() {
+function isTodayTask(taskDateStr) {
+  const taskDate = new Date(taskDateStr);
+  const today = new Date();
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <div className="space-y-1">
-          <CardTitle className="text-base">Time Management</CardTitle>
-          <CardDescription>Today time allocation</CardDescription>
-        </div>
+    taskDate.getDate() === today.getDate() &&
+    taskDate.getMonth() === today.getMonth() &&
+    taskDate.getFullYear() === today.getFullYear()
+  );
+}
+
+function parseTaskData(data) {
+  const lines = data.split("\n");
+  const dateLine = lines.find((line) => line.startsWith("Date:")) || "";
+  const detailLine = lines.find((line) => line.startsWith("Details:")) || "";
+  const dateStr = dateLine.replace("Date:", "").trim();
+  const details = detailLine.replace("Details:", "").trim();
+  return { dateStr, details };
+}
+
+export function TimeWidget({ data = [] }) {
+  const todayTasks = data.filter((task) => {
+    if (!task.data) return false;
+    const { dateStr } = parseTaskData(task.data);
+    return isTodayTask(dateStr);
+  });
+
+  return (
+    <Card className="rounded-2xl shadow-md">
+      <CardHeader className="flex flex-row items-center justify-between pb-1">
+        <CardTitle className="text-base font-semibold text-muted-foreground">
+          Today's Tasks
+        </CardTitle>
         <Clock className="h-4 w-4 text-muted-foreground" />
       </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="text-sm font-medium">Deep Work</div>
-              <div className="text-sm text-muted-foreground">2h 15m</div>
-            </div>
-            <div className="h-2 w-full rounded-full bg-muted">
-              <div className="h-full w-[60%] rounded-full bg-primary"></div>
-            </div>
+
+      <CardContent className="pt-0">
+        {todayTasks.length > 0 ? (
+          <div className="space-y-4 mt-2">
+            {todayTasks.slice(0, 3).map((task) => {
+              const { details } = parseTaskData(task.data);
+              return (
+                <div
+                  key={task.id}
+                  className={clsx(
+                    "flex items-start gap-3 p-2 rounded-md transition-all",
+                    task.completed
+                      ? "bg-green-50 dark:bg-green-950/40"
+                      : "bg-muted/10"
+                  )}
+                >
+                  <div className="pt-1">
+                    {task.completed ? (
+                      <CheckCircle2 className="h-5 w-5 text-green-600" />
+                    ) : (
+                      <div className="h-4 w-4 rounded-full bg-muted-foreground/40 mt-1" />
+                    )}
+                  </div>
+                  <div className="flex flex-col">
+                    <p
+                      className={clsx(
+                        "text-sm font-medium",
+                        task.completed && "line-through text-muted-foreground"
+                      )}
+                    >
+                      {task.text}
+                    </p>
+                    <p className="text-xs text-muted-foreground">{details}</p>
+                  </div>
+                </div>
+              );
+            })}
           </div>
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="text-sm font-medium">Meetings</div>
-              <div className="text-sm text-muted-foreground">1h 30m</div>
-            </div>
-            <div className="h-2 w-full rounded-full bg-muted">
-              <div className="h-full w-[40%] rounded-full bg-amber-500"></div>
-            </div>
-          </div>
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="text-sm font-medium">Breaks</div>
-              <div className="text-sm text-muted-foreground">45m</div>
-            </div>
-            <div className="h-2 w-full rounded-full bg-muted">
-              <div className="h-full w-[20%] rounded-full bg-green-500"></div>
-            </div>
-          </div>
-        </div>
+        ) : (
+          <p className="text-sm text-muted-foreground mt-4">
+            🎉 No tasks scheduled for today!
+          </p>
+        )}
       </CardContent>
-      <CardFooter>
+
+      <CardFooter className="pt-2">
         <Button variant="ghost" size="sm" asChild className="text-xs">
-          <Link href="/time">View time report</Link>
+          <Link href="/task">View time report</Link>
         </Button>
       </CardFooter>
     </Card>

@@ -12,9 +12,15 @@ import { Button } from "@/components/ui/button";
 import { Pause, Play, RotateCcw, Timer } from "lucide-react";
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 export function PomodoroWidget() {
   const [isRunning, setIsRunning] = useState(false);
+  const router = useRouter();
+
+  const handlePlayClick = () => {
+    router.push("/pomodoro");
+  };
 
   return (
     <Card>
@@ -29,11 +35,7 @@ export function PomodoroWidget() {
         <div className="text-4xl font-bold">25:00</div>
         <div className="mt-2 text-sm text-muted-foreground">Focus Session</div>
         <div className="mt-4 flex gap-2">
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => setIsRunning(!isRunning)}
-          >
+          <Button variant="outline" size="icon" onClick={handlePlayClick}>
             {isRunning ? (
               <Pause className="h-4 w-4" />
             ) : (

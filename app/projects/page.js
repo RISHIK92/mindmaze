@@ -50,7 +50,6 @@ export default function ProjectPage() {
         if (res.ok) {
           const response = await res.json();
           console.log("Tasks response:", response);
-          //   const tasksArray = response?.data;
           const tasksArray = Array.isArray(response)
             ? response
             : response?.data || [];
@@ -97,7 +96,6 @@ export default function ProjectPage() {
     }
   };
 
-  // Edit progress
   const handleToggleEdit = (index) => {
     setEditIdx(index);
     setEditProgress(projects[index].progress);
@@ -133,7 +131,6 @@ export default function ProjectPage() {
     }
   };
 
-  // Delete project
   const handleDeleteProject = async (index) => {
     const project = projects[index];
     setLoading(true);

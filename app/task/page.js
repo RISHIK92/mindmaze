@@ -96,7 +96,7 @@ const apiService = {
     });
     if (!response.ok) throw new Error("Failed to delete task");
     const result = await response.json();
-    return result; // Returns {success: true, message: ...}
+    return result;
   },
 
   async deleteCompletedTasks() {
@@ -109,7 +109,7 @@ const apiService = {
     });
     if (!response.ok) throw new Error("Failed to delete completed tasks");
     const result = await response.json();
-    return result; // Returns {success: true, message: ...}
+    return result;
   },
 };
 
@@ -374,7 +374,6 @@ export default function TimeManagementPage() {
         completedAt: false,
       });
 
-      // apiService.createTask now returns the data directly
       setTasks((prev) => [newTask, ...prev]);
       setTaskText("");
       setTaskData("");
@@ -396,7 +395,6 @@ export default function TimeManagementPage() {
   const handleToggleTask = async (id) => {
     try {
       const updatedTask = await apiService.toggleTask(id);
-      // apiService.toggleTask now returns the data directly
       setTasks((prev) =>
         prev.map((task) => (task.id === id ? updatedTask : task))
       );
@@ -419,7 +417,6 @@ export default function TimeManagementPage() {
   const handleEditTask = async (id, updateData) => {
     try {
       const updatedTask = await apiService.updateTask(id, updateData);
-      // apiService.updateTask now returns the data directly
       setTasks((prev) =>
         prev.map((task) => (task.id === id ? updatedTask : task))
       );
@@ -436,14 +433,6 @@ export default function TimeManagementPage() {
     const selectedDateString = selectedDate.toDateString();
     const taskContainsDate = task.data.includes(selectedDateString);
 
-    // Debug logging
-    console.log("Filtering task:", {
-      taskId: task.id,
-      taskData: task.data,
-      selectedDateString,
-      taskContainsDate,
-    });
-
     return taskContainsDate;
   });
 
@@ -452,7 +441,6 @@ export default function TimeManagementPage() {
   ).length;
   const totalCount = selectedDateTasks.length;
 
-  // Debug logging
   console.log("Component state:", {
     totalTasks: tasks.length,
     selectedDate: selectedDate?.toDateString(),
