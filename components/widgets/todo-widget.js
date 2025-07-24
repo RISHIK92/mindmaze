@@ -13,8 +13,6 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { CheckSquare, Plus, Loader2, Trash2 } from "lucide-react";
 import { auth } from "@/lib/firebase";
-import { BACKEND_URL } from "@/app/config";
-import { onAuthStateChanged } from "firebase/auth";
 
 export function TodoWidget({ data = [], onUpdate }) {
   const [todos, setTodos] = useState(data);
@@ -42,7 +40,9 @@ export function TodoWidget({ data = [], onUpdate }) {
       const token = await getAuthToken();
 
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000"}/todos`,
+        `${
+          process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3000"
+        }/todos`,
         {
           method: "POST",
           headers: {
@@ -82,7 +82,7 @@ export function TodoWidget({ data = [], onUpdate }) {
 
       const response = await fetch(
         `${
-          process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000"
+          process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3000"
         }/todos/${todoId}`,
         {
           method: "PUT",
@@ -116,7 +116,7 @@ export function TodoWidget({ data = [], onUpdate }) {
 
       const response = await fetch(
         `${
-          process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000"
+          process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3000"
         }/todos/${todoId}`,
         {
           method: "DELETE",
