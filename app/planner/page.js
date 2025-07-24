@@ -27,7 +27,18 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Plus, ListChecks, Clock } from "lucide-react";
+import { Plus, ListChecks, Clock, Trash2 } from "lucide-react";
+import { auth } from "@/lib/firebase";
+import { BACKEND_URL } from "@/app/config";
+import { onAuthStateChanged } from "firebase/auth";
+
+const API_BASE = `${BACKEND_URL}/planner`;
+
+async function getIdToken() {
+  const user = auth.currentUser;
+  if (!user) return null;
+  return await user.getIdToken();
+}
 
 export default function PlannerPage() {
   const [calendar, setCalendar] = useState(false);
@@ -41,6 +52,12 @@ export default function PlannerPage() {
   const [priority, setPriority] = useState("medium");
   const [category, setCategory] = useState("Work");
 
+  const [editingId, setEditingId] = useState(null);
+  const [editTask, setEditTask] = useState("");
+  const [editDeadline, setEditDeadline] = useState("");
+  const [editPriority, setEditPriority] = useState("medium");
+  const [editCategory, setEditCategory] = useState("Work");
+
   const categories = [
     "Work",
     "Personal",
@@ -49,6 +66,41 @@ export default function PlannerPage() {
     "Shopping",
     "Other",
   ];
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        setTasks([]);
+        return;
+      }
+
+      try {
+        const idToken = await user.getIdToken();
+        const res = await fetch(`${API_BASE}`, {
+          headers: {
+            Authorization: `Bearer ${idToken}`,
+          },
+        });
+
+        if (res.ok) {
+          const response = await res.json();
+          console.log("Tasks response:", response);
+          const tasksArray = Array.isArray(response)
+            ? response
+            : response?.data || [];
+          setTasks(Array.isArray(tasksArray) ? tasksArray : []);
+        } else {
+          console.error("Failed to fetch tasks:", res.status, res.statusText);
+          setTasks([]);
+        }
+      } catch (error) {
+        console.error("Error fetching tasks:", error);
+        setTasks([]);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   const handleCalender = () => {
     setCalendar((e) => !e);
@@ -85,30 +137,94 @@ export default function PlannerPage() {
     };
   }, [calendar]);
 
-  const handleAddTask = (e) => {
+  const handleAddTask = async (e) => {
     e.preventDefault();
     if (!task.trim() || !deadline.trim()) return;
-    setTasks([
-      ...tasks,
-      {
-        id: Date.now(),
-        text: task.trim(),
-        deadline,
-        priority,
-        category,
-        completed: false,
+    const idToken = await getIdToken();
+    if (!idToken) return;
+    const res = await fetch(API_BASE, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${idToken}`,
       },
-    ]);
-    setTask("");
-    setDeadline("");
-    setPriority("medium");
-    setCategory("Work");
+      body: JSON.stringify({
+        task: task.trim(),
+        priority,
+        categories: category,
+        deadline,
+        date: new Date().toISOString(),
+      }),
+    });
+    if (res.ok) {
+      const newTask = await res.json();
+      setTasks((prev) => [newTask, ...prev]);
+      setTask("");
+      setDeadline("");
+      setPriority("medium");
+      setCategory("Work");
+    }
   };
 
-  const handleToggleTask = (idx) => {
-    setTasks((tasks) =>
-      tasks.map((t, i) => (i === idx ? { ...t, completed: !t.completed } : t))
-    );
+  const handleEditTask = async () => {
+    if (!editTask.trim() || !editDeadline.trim() || !editingId) return;
+    const idToken = await getIdToken();
+    if (!idToken) return;
+    const res = await fetch(`${API_BASE}/${editingId}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${idToken}`,
+      },
+      body: JSON.stringify({
+        task: editTask.trim(),
+        priority: editPriority,
+        categories: editCategory,
+        deadline: editDeadline,
+        date: new Date().toISOString(),
+      }),
+    });
+    if (res.ok) {
+      const updatedTask = await res.json();
+      setTasks((prev) =>
+        prev.map((t) => (t.id === editingId ? updatedTask : t))
+      );
+      setEditingId(null);
+      setEditTask("");
+      setEditDeadline("");
+      setEditPriority("medium");
+      setEditCategory("Work");
+    }
+  };
+
+  const startEditTask = (t) => {
+    setEditingId(t.id);
+    setEditTask(t.task);
+    setEditDeadline(t.deadline);
+    setEditPriority(t.priority);
+    setEditCategory(t.categories);
+  };
+
+  const cancelEditTask = () => {
+    setEditingId(null);
+    setEditTask("");
+    setEditDeadline("");
+    setEditPriority("medium");
+    setEditCategory("Work");
+  };
+
+  const handleDeleteTask = async (id) => {
+    const idToken = await getIdToken();
+    if (!idToken) return;
+    const res = await fetch(`${API_BASE}/${id}`, {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${idToken}`,
+      },
+    });
+    if (res.ok) {
+      setTasks((prev) => prev.filter((t) => t.id !== id));
+    }
   };
 
   return (
@@ -211,31 +327,103 @@ export default function PlannerPage() {
                   {tasks.length === 0 && (
                     <li className="text-muted-foreground">No tasks yet.</li>
                   )}
-                  {tasks.map((t, idx) => (
-                    <li
-                      key={t.id}
-                      className={`flex items-center gap-2 ${
-                        t.completed ? "line-through text-muted-foreground" : ""
-                      }`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={t.completed}
-                        onChange={() => handleToggleTask(idx)}
-                      />
-                      <span>{t.text}</span>
-                      <span className="flex items-center gap-1 text-xs text-muted-foreground ml-2">
-                        <Clock className="h-4 w-4" />
-                        {t.deadline}
-                      </span>
-                      <span className="ml-2 text-xs px-2 py-0.5 rounded bg-gray-100 border">
-                        {t.priority}
-                      </span>
-                      <span className="ml-2 text-xs px-2 py-0.5 rounded bg-gray-100 border">
-                        {t.category}
-                      </span>
-                    </li>
-                  ))}
+                  {tasks.map((t, idx) =>
+                    editingId === t.id ? (
+                      <li
+                        key={t.id}
+                        className="flex flex-col gap-2 border p-2 rounded"
+                      >
+                        <Input
+                          value={editTask}
+                          onChange={(e) => setEditTask(e.target.value)}
+                          placeholder="Edit task"
+                        />
+                        <Input
+                          type="time"
+                          value={editDeadline}
+                          onChange={(e) => setEditDeadline(e.target.value)}
+                          placeholder="Deadline"
+                        />
+                        <Select
+                          value={editPriority}
+                          onValueChange={setEditPriority}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Priority" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="low">Low</SelectItem>
+                            <SelectItem value="medium">Medium</SelectItem>
+                            <SelectItem value="high">High</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <Select
+                          value={editCategory}
+                          onValueChange={setEditCategory}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Category" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {categories.map((cat) => (
+                              <SelectItem key={cat} value={cat}>
+                                {cat}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <div className="flex gap-2 mt-2">
+                          <Button size="sm" onClick={handleEditTask}>
+                            Save
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={cancelEditTask}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      </li>
+                    ) : (
+                      <li
+                        key={t.id}
+                        className={`flex items-center gap-2 ${
+                          t.completed
+                            ? "line-through text-muted-foreground"
+                            : ""
+                        }`}
+                      >
+                        <span>{t.task}</span>
+                        <span className="flex items-center gap-1 text-xs text-muted-foreground ml-2">
+                          <Clock className="h-4 w-4" />
+                          {t.deadline}
+                        </span>
+                        <span className="ml-2 text-xs px-2 py-0.5 rounded bg-gray-100 border">
+                          {t.priority}
+                        </span>
+                        <span className="ml-2 text-xs px-2 py-0.5 rounded bg-gray-100 border">
+                          {t.categories}
+                        </span>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="ml-2"
+                          onClick={() => startEditTask(t)}
+                        >
+                          Edit
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          className="ml-2"
+                          onClick={() => handleDeleteTask(t.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </li>
+                    )
+                  )}
                 </ul>
               </CardContent>
             </Card>

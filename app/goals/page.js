@@ -26,7 +26,18 @@ import {
   CardFooter,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Calendar as CalendarIcon } from "lucide-react";
+import { Calendar as CalendarIcon, Trash2 } from "lucide-react";
+import { auth } from "@/lib/firebase";
+import { BACKEND_URL } from "@/app/config";
+import { onAuthStateChanged } from "firebase/auth";
+
+const API_BASE = `${BACKEND_URL}/goals`;
+
+async function getIdToken() {
+  const user = auth.currentUser;
+  if (!user) return null;
+  return await user.getIdToken();
+}
 
 export default function GoalsPage() {
   const [calendar, setCalendar] = useState(false);
@@ -34,13 +45,47 @@ export default function GoalsPage() {
   const calendarRef = useRef(null);
   const buttonRef = useRef(null);
 
-  // Goal state
   const [goals, setGoals] = useState([]);
   const [title, setTitle] = useState("");
   const [deadline, setDeadline] = useState("");
   const [progress, setProgress] = useState(0);
   const [editingIdx, setEditingIdx] = useState(null);
   const [editProgress, setEditProgress] = useState(0);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        setGoals([]);
+        return;
+      }
+
+      try {
+        const idToken = await user.getIdToken();
+        const res = await fetch(`${API_BASE}/?page=1&limit=1000`, {
+          headers: {
+            Authorization: `Bearer ${idToken}`,
+          },
+        });
+
+        if (res.ok) {
+          const response = await res.json();
+          console.log("Tasks response:", response);
+          const tasksArray = Array.isArray(response)
+            ? response
+            : response?.data || [];
+          setGoals(Array.isArray(tasksArray) ? tasksArray : []);
+        } else {
+          console.error("Failed to fetch tasks:", res.status, res.statusText);
+          setGoals([]);
+        }
+      } catch (error) {
+        console.error("Error fetching tasks:", error);
+        setGoals([]);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   const handleCalender = () => {
     setCalendar((e) => !e);
@@ -77,19 +122,29 @@ export default function GoalsPage() {
     };
   }, [calendar]);
 
-  const handleAddGoal = () => {
+  const handleAddGoal = async () => {
     if (!title.trim() || !deadline.trim()) return;
-    setGoals([
-      ...goals,
-      {
-        title,
+    const idToken = await getIdToken();
+    if (!idToken) return;
+    const res = await fetch(API_BASE, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${idToken}`,
+      },
+      body: JSON.stringify({
+        goal: title.trim(),
         deadline,
         progress: Number(progress),
-      },
-    ]);
-    setTitle("");
-    setDeadline("");
-    setProgress(0);
+      }),
+    });
+    if (res.ok) {
+      const newGoal = await res.json();
+      setGoals((prev) => [newGoal, ...prev]);
+      setTitle("");
+      setDeadline("");
+      setProgress(0);
+    }
   };
 
   const handleEditProgress = (idx, currentProgress) => {
@@ -97,14 +152,44 @@ export default function GoalsPage() {
     setEditProgress(currentProgress);
   };
 
-  const handleSaveProgress = (idx) => {
-    setGoals((goals) =>
-      goals.map((goal, i) =>
-        i === idx ? { ...goal, progress: Number(editProgress) } : goal
-      )
-    );
-    setEditingIdx(null);
-    setEditProgress(0);
+  const handleSaveProgress = async (idx) => {
+    const goal = goals[idx];
+    const idToken = await getIdToken();
+    if (!idToken) return;
+    const res = await fetch(`${API_BASE}/${goal.id}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${idToken}`,
+      },
+      body: JSON.stringify({
+        goal: goal.goal,
+        deadline: goal.deadline,
+        progress: Number(editProgress),
+      }),
+    });
+    if (res.ok) {
+      const updatedGoal = await res.json();
+      setGoals((goals) => goals.map((g, i) => (i === idx ? updatedGoal : g)));
+      setEditingIdx(null);
+      setEditProgress(0);
+    }
+  };
+
+  // Delete goal in backend
+  const handleDeleteGoal = async (idx) => {
+    const goal = goals[idx];
+    const idToken = await getIdToken();
+    if (!idToken) return;
+    const res = await fetch(`${API_BASE}/${goal.id}`, {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${idToken}`,
+      },
+    });
+    if (res.ok) {
+      setGoals((goals) => goals.filter((_, i) => i !== idx));
+    }
   };
 
   return (
@@ -197,9 +282,9 @@ export default function GoalsPage() {
                 </Card>
               )}
               {goals.map((goal, idx) => (
-                <Card key={idx}>
+                <Card key={goal.id ?? idx}>
                   <CardHeader>
-                    <CardTitle>{goal.title}</CardTitle>
+                    <CardTitle>{goal.goal}</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="flex items-center gap-2 mb-2">
@@ -249,6 +334,14 @@ export default function GoalsPage() {
                           </Button>
                         </>
                       )}
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => handleDeleteGoal(idx)}
+                        className="ml-2"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>

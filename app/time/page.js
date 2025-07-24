@@ -55,7 +55,7 @@ const apiService = {
     });
     if (!response.ok) throw new Error("Failed to create task");
     const result = await response.json();
-    return result.data; // Extract data from {success: true, data: ...}
+    return result.data;
   },
 
   async updateTask(id, data) {
@@ -70,7 +70,7 @@ const apiService = {
     });
     if (!response.ok) throw new Error("Failed to update task");
     const result = await response.json();
-    return result.data; // Extract data from {success: true, data: ...}
+    return result.data;
   },
 
   async toggleTask(id) {
@@ -83,7 +83,7 @@ const apiService = {
     });
     if (!response.ok) throw new Error("Failed to toggle task");
     const result = await response.json();
-    return result.data; // Extract data from {success: true, data: ...}
+    return result.data;
   },
 
   async deleteTask(id) {
@@ -284,7 +284,7 @@ function TaskList({ tasks, onToggle, onDelete, onEdit, isLoading }) {
     <div className="space-y-3">
       {tasks.map((task, idx) => (
         <TaskItem
-          key={task.id ?? idx} // Fallback to idx if id is null/undefined
+          key={task.id ?? idx}
           task={task}
           onToggle={onToggle}
           onDelete={onDelete}
