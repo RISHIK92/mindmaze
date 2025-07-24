@@ -13,10 +13,12 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 
 function PomodoroTimer() {
+  const [minutes, setMinutes] = useState(25);
   const [secondsLeft, setSecondsLeft] = useState(25 * 60);
   const [isRunning, setIsRunning] = useState(false);
   const intervalRef = useRef();
   const fullscreenRef = useRef(null);
+  const inputRef = useRef(null);
 
   const formatTime = (secs) => {
     const m = Math.floor(secs / 60)
@@ -24,6 +26,13 @@ function PomodoroTimer() {
       .padStart(2, "0");
     const s = (secs % 60).toString().padStart(2, "0");
     return `${m}:${s}`;
+  };
+
+  const handleMinutesChange = (e) => {
+    const value = Math.max("", Math.min(120, Number(e.target.value)));
+    setMinutes(value);
+    setSecondsLeft(value * 60);
+    inputRef.current?.focus();
   };
 
   const startTimer = () => {
@@ -62,7 +71,7 @@ function PomodoroTimer() {
   const resetTimer = () => {
     setIsRunning(false);
     clearInterval(intervalRef.current);
-    setSecondsLeft(25 * 60);
+    setSecondsLeft(minutes * 60);
 
     if (document.fullscreenElement) {
       document.exitFullscreen();
@@ -79,8 +88,23 @@ function PomodoroTimer() {
         <CardTitle className="text-center text-2xl">Pomodoro Timer</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="text-6xl font-mono text-center mb-6">
-          {formatTime(secondsLeft)}
+        <div className="flex flex-col items-center gap-4 mb-6">
+          <label className="text-sm font-medium">
+            Set Minutes:&nbsp;
+            <input
+              ref={inputRef}
+              type="number"
+              min={1}
+              max={120}
+              value={minutes}
+              disabled={isRunning}
+              onChange={handleMinutesChange}
+              className="border rounded px-2 py-1 w-16 text-center"
+            />
+          </label>
+          <div className="text-6xl font-mono text-center">
+            {formatTime(secondsLeft)}
+          </div>
         </div>
         <div className="flex justify-center gap-4">
           <Button onClick={startTimer} disabled={isRunning}>
@@ -97,7 +121,7 @@ function PomodoroTimer() {
       <CardFooter className="justify-center text-sm text-muted-foreground">
         {secondsLeft === 0
           ? "Session Complete!"
-          : "Stay focused for 25 minutes."}
+          : `Stay focused for ${minutes} minute${minutes > 1 ? "s" : ""}.`}
       </CardFooter>
     </Card>
   );
