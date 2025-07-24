@@ -19,6 +19,7 @@ import {
   signInWithPopup,
 } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import { loginUser } from "@/lib/api";
 
 export function LoginForm({ className, ...props }) {
   const router = useRouter();
@@ -26,10 +27,23 @@ export function LoginForm({ className, ...props }) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
+  const handleLogin = async () => {
+    try {
+      const token = await loginUser();
+      console.log("JWT from backend:", token);
+      localStorage.setItem("jwt", token);
+      return token;
+    } catch (err) {
+      console.error(err.message);
+      return null;
+    }
+  };
+
   const handleEmailLogin = async () => {
     setError("");
     try {
       await signInWithEmailAndPassword(auth, email, password);
+      await handleLogin();
       router.push("/dashboard");
     } catch (err) {
       setError(err.message);
@@ -41,6 +55,11 @@ export function LoginForm({ className, ...props }) {
     try {
       const provider = new GoogleAuthProvider();
       await signInWithPopup(auth, provider);
+      const token = await handleLogin();
+      if (!token) {
+        setError("User does not exist");
+        return;
+      }
       router.push("/dashboard");
     } catch (err) {
       setError(err.message);

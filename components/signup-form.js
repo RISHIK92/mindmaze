@@ -19,6 +19,7 @@ import {
   signInWithPopup,
 } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import { signupUser } from "@/lib/api";
 
 export function SignupForm({ className, ...props }) {
   const router = useRouter();
@@ -26,10 +27,28 @@ export function SignupForm({ className, ...props }) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
+  const handleSignup = async () => {
+    try {
+      const res = await signupUser();
+      if (res?.msg === "User Already Exists") {
+        setError("User already exists. Please login.");
+        return false;
+      }
+      console.log("Signup successful:", res);
+      return true;
+    } catch (err) {
+      setError("Signup failed. Please try again.");
+      console.error(err.message);
+      return false;
+    }
+  };
+
   const handleEmailSignup = async () => {
     setError("");
     try {
       await createUserWithEmailAndPassword(auth, email, password);
+      const success = await handleSignup();
+      if (!success) return;
       router.push("/dashboard");
     } catch (err) {
       setError(err.message);
@@ -41,6 +60,8 @@ export function SignupForm({ className, ...props }) {
     try {
       const provider = new GoogleAuthProvider();
       await signInWithPopup(auth, provider);
+      const success = await handleSignup();
+      if (!success) return;
       router.push("/dashboard");
     } catch (err) {
       setError(err.message);

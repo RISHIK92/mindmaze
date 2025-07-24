@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
@@ -13,56 +13,259 @@ import {
 } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Trash2,
   Plus,
   Calendar as CalendarIcon,
   Clock,
   CheckCircle2,
+  Loader2,
+  AlertCircle,
+  Edit3,
+  Save,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, isToday, isTomorrow, isYesterday } from "date-fns";
+import { auth } from "@/lib/firebase";
+import { BACKEND_URL } from "../config";
+import { onAuthStateChanged } from "firebase/auth";
 
-function TaskItem({ task, onToggle, onDelete }) {
+const API_BASE = `${BACKEND_URL}/time-management`;
+
+async function getIdToken() {
+  const user = auth.currentUser;
+  if (!user) return null;
+  return await user.getIdToken();
+}
+
+const apiService = {
+  async createTask(data) {
+    const idToken = await getIdToken();
+    const response = await fetch(API_BASE, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${idToken}`,
+      },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) throw new Error("Failed to create task");
+    const result = await response.json();
+    return result.data; // Extract data from {success: true, data: ...}
+  },
+
+  async updateTask(id, data) {
+    const idToken = await getIdToken();
+    const response = await fetch(`${API_BASE}/${id}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${idToken}`,
+      },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) throw new Error("Failed to update task");
+    const result = await response.json();
+    return result.data; // Extract data from {success: true, data: ...}
+  },
+
+  async toggleTask(id) {
+    const idToken = await getIdToken();
+    const response = await fetch(`${API_BASE}/${id}/toggle`, {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${idToken}`,
+      },
+    });
+    if (!response.ok) throw new Error("Failed to toggle task");
+    const result = await response.json();
+    return result.data; // Extract data from {success: true, data: ...}
+  },
+
+  async deleteTask(id) {
+    const idToken = await getIdToken();
+    const response = await fetch(`${API_BASE}/${id}`, {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${idToken}`,
+      },
+    });
+    if (!response.ok) throw new Error("Failed to delete task");
+    const result = await response.json();
+    return result; // Returns {success: true, message: ...}
+  },
+
+  async deleteCompletedTasks() {
+    const idToken = await getIdToken();
+    const response = await fetch(`${API_BASE}/completed/all`, {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${idToken}`,
+      },
+    });
+    if (!response.ok) throw new Error("Failed to delete completed tasks");
+    const result = await response.json();
+    return result; // Returns {success: true, message: ...}
+  },
+};
+
+function TaskItem({ task, onToggle, onDelete, onEdit }) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editText, setEditText] = useState(task.text);
+  const [editData, setEditData] = useState(task.data);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleSaveEdit = async () => {
+    if (!editText.trim()) return;
+
+    setIsLoading(true);
+    try {
+      await onEdit(task.id, { text: editText.trim(), data: editData.trim() });
+      setIsEditing(false);
+    } catch (error) {
+      console.error("Failed to save edit:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditText(task.text);
+    setEditData(task.data);
+    setIsEditing(false);
+  };
+
+  if (isEditing) {
+    return (
+      <div className="p-4 rounded-lg border border-gray-300 bg-white">
+        <div className="space-y-3">
+          <div>
+            <Label htmlFor="edit-text" className="text-xs text-gray-600">
+              Task
+            </Label>
+            <Input
+              id="edit-text"
+              value={editText}
+              onChange={(e) => setEditText(e.target.value)}
+              className="mt-1"
+              placeholder="Task title..."
+            />
+          </div>
+          <div>
+            <Label htmlFor="edit-data" className="text-xs text-gray-600">
+              Details
+            </Label>
+            <Textarea
+              id="edit-data"
+              value={editData}
+              onChange={(e) => setEditData(e.target.value)}
+              className="mt-1 min-h-[60px]"
+              placeholder="Task details..."
+            />
+          </div>
+          <div className="flex gap-2 justify-end">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleCancelEdit}
+              disabled={isLoading}
+            >
+              <X className="h-3 w-3 mr-1" />
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleSaveEdit}
+              disabled={isLoading || !editText.trim()}
+            >
+              {isLoading ? (
+                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+              ) : (
+                <Save className="h-3 w-3 mr-1" />
+              )}
+              Save
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       className={cn(
-        "group flex items-center gap-3 p-4 rounded-lg border transition-all duration-200 hover:shadow-md",
+        "group flex items-start gap-3 p-4 rounded-lg border transition-all duration-200 hover:shadow-md",
         "bg-white border-gray-200 hover:border-gray-300",
-        task.completed && "bg-gray-50 border-gray-100"
+        task.completedAt && "bg-gray-50 border-gray-100"
       )}
     >
       <button
         onClick={() => onToggle(task.id)}
-        className="flex-shrink-0 transition-all duration-200 hover:scale-110"
+        className="flex-shrink-0 mt-0.5 transition-all duration-200 hover:scale-110"
       >
-        {task.completed ? (
+        {task.completedAt ? (
           <CheckCircle2 className="h-5 w-5 text-black" />
         ) : (
           <div className="h-5 w-5 rounded-full border-2 border-gray-300 hover:border-gray-500 transition-colors" />
         )}
       </button>
 
-      <span
-        className={cn(
-          "flex-1 text-sm font-medium transition-all duration-200",
-          task.completed ? "line-through text-gray-400" : "text-gray-900"
+      <div className="flex-1 min-w-0">
+        <div
+          className={cn(
+            "text-sm font-medium transition-all duration-200 mb-1",
+            task.completedAt ? "line-through text-gray-400" : "text-gray-900"
+          )}
+        >
+          {task.text}
+        </div>
+        {task.data && (
+          <div
+            className={cn(
+              "text-xs transition-all duration-200",
+              task.completedAt ? "text-gray-400" : "text-gray-600"
+            )}
+          >
+            {task.data}
+          </div>
         )}
-      >
-        {task.text}
-      </span>
+        <div className="text-xs text-gray-400 mt-2">
+          Created {format(new Date(task.createdAt), "MMM d, HH:mm")}
+        </div>
+      </div>
 
-      <button
-        onClick={() => onDelete(task.id)}
-        className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-all duration-200 hover:scale-110 text-gray-400 hover:text-red-500"
-      >
-        <Trash2 className="h-4 w-4" />
-      </button>
+      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200">
+        <button
+          onClick={() => setIsEditing(true)}
+          className="flex-shrink-0 p-1 hover:bg-gray-100 rounded transition-colors text-gray-400 hover:text-blue-500"
+        >
+          <Edit3 className="h-3 w-3" />
+        </button>
+        <button
+          onClick={() => onDelete(task.id)}
+          className="flex-shrink-0 p-1 hover:bg-gray-100 rounded transition-colors text-gray-400 hover:text-red-500"
+        >
+          <Trash2 className="h-3 w-3" />
+        </button>
+      </div>
     </div>
   );
 }
 
-function TaskList({ tasks, onToggle, onDelete }) {
+function TaskList({ tasks, onToggle, onDelete, onEdit, isLoading }) {
+  if (isLoading) {
+    return (
+      <div className="text-center py-8">
+        <Loader2 className="h-6 w-6 mx-auto mb-3 animate-spin text-gray-400" />
+        <p className="text-gray-500 text-sm">Loading tasks...</p>
+      </div>
+    );
+  }
+
   if (tasks.length === 0) {
     return (
       <div className="text-center py-8">
@@ -79,12 +282,13 @@ function TaskList({ tasks, onToggle, onDelete }) {
 
   return (
     <div className="space-y-3">
-      {tasks.map((task) => (
+      {tasks.map((task, idx) => (
         <TaskItem
-          key={task.id}
+          key={task.id ?? idx} // Fallback to idx if id is null/undefined
           task={task}
           onToggle={onToggle}
           onDelete={onDelete}
+          onEdit={onEdit}
         />
       ))}
     </div>
@@ -114,53 +318,147 @@ function DateDisplay({ date }) {
 
 export default function TimeManagementPage() {
   const [selectedDate, setSelectedDate] = useState();
-  const [task, setTask] = useState("");
+  const [taskText, setTaskText] = useState("");
+  const [taskData, setTaskData] = useState("");
   const [tasks, setTasks] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  const handleAddTask = () => {
-    if (!task.trim() || !selectedDate) return;
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        setTasks([]);
+        return;
+      }
 
-    const newTask = {
-      id: Date.now().toString(),
-      text: task.trim(),
-      date: selectedDate.toDateString(),
-      completed: false,
-      createdAt: new Date(),
-    };
+      try {
+        const idToken = await user.getIdToken();
+        const res = await fetch(`${API_BASE}/?page=1&limit=1000`, {
+          headers: {
+            Authorization: `Bearer ${idToken}`,
+          },
+        });
 
-    setTasks([...tasks, newTask]);
-    setTask("");
+        if (res.ok) {
+          const response = await res.json();
+          console.log("Tasks response:", response); // Debug log
+          // Backend returns {success: true, data: [...], pagination: {...}}
+          const tasksArray = response?.data;
+          setTasks(Array.isArray(tasksArray) ? tasksArray : []);
+        } else {
+          console.error("Failed to fetch tasks:", res.status, res.statusText);
+          setTasks([]);
+        }
+      } catch (error) {
+        console.error("Error fetching tasks:", error);
+        setTasks([]);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  const handleAddTask = async () => {
+    if (!taskText.trim() || !selectedDate) return;
+
+    setIsLoading(true);
+    setError("");
+    try {
+      const taskDataFormatted = `Date: ${selectedDate.toDateString()}${
+        taskData.trim() ? `\nDetails: ${taskData.trim()}` : ""
+      }`;
+
+      const newTask = await apiService.createTask({
+        text: taskText.trim(),
+        data: taskDataFormatted,
+        completedAt: false,
+      });
+
+      // apiService.createTask now returns the data directly
+      setTasks((prev) => [newTask, ...prev]);
+      setTaskText("");
+      setTaskData("");
+    } catch (error) {
+      setError("Failed to add task. Please try again.");
+      console.error("Error adding task:", error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleKeyPress = (e) => {
-    if (e.key === "Enter") {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
       handleAddTask();
     }
   };
 
-  const handleToggleTask = (id) => {
-    setTasks((prev) =>
-      prev.map((task) =>
-        task.id === id ? { ...task, completed: !task.completed } : task
-      )
-    );
+  const handleToggleTask = async (id) => {
+    try {
+      const updatedTask = await apiService.toggleTask(id);
+      // apiService.toggleTask now returns the data directly
+      setTasks((prev) =>
+        prev.map((task) => (task.id === id ? updatedTask : task))
+      );
+    } catch (error) {
+      setError("Failed to update task. Please try again.");
+      console.error("Error toggling task:", error);
+    }
   };
 
-  const handleDeleteTask = (id) => {
-    setTasks((prev) => prev.filter((task) => task.id !== id));
+  const handleDeleteTask = async (id) => {
+    try {
+      await apiService.deleteTask(id);
+      setTasks((prev) => prev.filter((task) => task.id !== id));
+    } catch (error) {
+      setError("Failed to delete task. Please try again.");
+      console.error("Error deleting task:", error);
+    }
   };
 
-  const selectedDateTasks = tasks.filter(
-    (t) => selectedDate && t.date === selectedDate.toDateString()
-  );
+  const handleEditTask = async (id, updateData) => {
+    try {
+      const updatedTask = await apiService.updateTask(id, updateData);
+      // apiService.updateTask now returns the data directly
+      setTasks((prev) =>
+        prev.map((task) => (task.id === id ? updatedTask : task))
+      );
+    } catch (error) {
+      setError("Failed to update task. Please try again.");
+      console.error("Error editing task:", error);
+      throw error;
+    }
+  };
+
+  const selectedDateTasks = tasks.filter((task) => {
+    if (!selectedDate || !task.data) return false;
+
+    const selectedDateString = selectedDate.toDateString();
+    const taskContainsDate = task.data.includes(selectedDateString);
+
+    // Debug logging
+    console.log("Filtering task:", {
+      taskId: task.id,
+      taskData: task.data,
+      selectedDateString,
+      taskContainsDate,
+    });
+
+    return taskContainsDate;
+  });
 
   const completedCount = selectedDateTasks.filter(
-    (task) => task.completed
+    (task) => task.completedAt
   ).length;
   const totalCount = selectedDateTasks.length;
 
-  const allTasks = tasks.length;
-  const allCompleted = tasks.filter((task) => task.completed).length;
+  // Debug logging
+  console.log("Component state:", {
+    totalTasks: tasks.length,
+    selectedDate: selectedDate?.toDateString(),
+    selectedDateTasks: selectedDateTasks.length,
+    allTasks: tasks.map((t) => ({ id: t.id, text: t.text, data: t.data })),
+  });
 
   return (
     <SidebarProvider>
@@ -175,7 +473,16 @@ export default function TimeManagementPage() {
         </header>
 
         <main className="flex-1 overflow-auto bg-gray-50/50">
-          <div className="container max-w-6xl mx-auto p-6">
+          <div className="container max-w-7xl mx-auto p-6">
+            {error && (
+              <Alert className="mb-6 border-red-200 bg-red-50">
+                <AlertCircle className="h-4 w-4 text-red-600" />
+                <AlertDescription className="text-red-800">
+                  {error}
+                </AlertDescription>
+              </Alert>
+            )}
+
             <div className="mb-8">
               <div className="flex items-center justify-between mb-6">
                 <div>
@@ -187,65 +494,58 @@ export default function TimeManagementPage() {
                     management
                   </p>
                 </div>
-                {allTasks > 0 && (
-                  <div className="flex gap-2">
-                    <Badge variant="outline" className="bg-white">
-                      {allTasks} total tasks
-                    </Badge>
-                    <Badge variant="outline" className="bg-black text-white">
-                      {allCompleted} completed
-                    </Badge>
-                  </div>
-                )}
               </div>
             </div>
 
-            <div className="grid lg:grid-cols-2 gap-8">
-              <Card className="border-gray-200 shadow-sm">
-                <CardHeader className="pb-4">
-                  <CardTitle className="flex items-center gap-2 text-gray-900">
-                    <CalendarIcon className="h-5 w-5" />
-                    Calendar
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <Calendar
-                    mode="single"
-                    selected={selectedDate}
-                    onSelect={setSelectedDate}
-                    className="rounded-md border border-gray-200 bg-white"
-                    classNames={{
-                      months:
-                        "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
-                      month: "space-y-4",
-                      caption: "flex justify-center pt-1 relative items-center",
-                      caption_label: "text-sm font-medium text-gray-900",
-                      nav: "space-x-1 flex items-center",
-                      nav_button:
-                        "h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100 hover:bg-gray-100 rounded-md transition-colors",
-                      nav_button_previous: "absolute left-1",
-                      nav_button_next: "absolute right-1",
-                      table: "w-full border-collapse space-y-1",
-                      head_row: "flex",
-                      head_cell:
-                        "text-gray-500 rounded-md w-9 font-normal text-[0.8rem]",
-                      row: "flex w-full mt-2",
-                      cell: "text-center text-sm p-0 relative [&:has([aria-selected])]:bg-gray-100 first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md focus-within:relative focus-within:z-20",
-                      day: "h-9 w-9 p-0 font-normal aria-selected:opacity-100 hover:bg-gray-100 rounded-md transition-colors",
-                      day_selected:
-                        "bg-black text-white hover:bg-black hover:text-white focus:bg-black focus:text-white",
-                      day_today: "bg-gray-100 text-gray-900 font-medium",
-                      day_outside: "text-gray-400 opacity-50",
-                      day_disabled: "text-gray-400 opacity-50",
-                      day_range_middle:
-                        "aria-selected:bg-gray-100 aria-selected:text-gray-900",
-                      day_hidden: "invisible",
-                    }}
-                  />
-                </CardContent>
-              </Card>
+            <div className="grid lg:grid-cols-3 gap-8">
+              <div className="lg:col-span-1 space-y-6">
+                <Card className="border-gray-200 shadow-sm">
+                  <CardHeader className="pb-4">
+                    <CardTitle className="flex items-center gap-2 text-gray-900">
+                      <CalendarIcon className="h-5 w-5" />
+                      Calendar
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <Calendar
+                      mode="single"
+                      selected={selectedDate}
+                      onSelect={setSelectedDate}
+                      className="rounded-md border border-gray-200 bg-white"
+                      classNames={{
+                        months:
+                          "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
+                        month: "space-y-4",
+                        caption:
+                          "flex justify-center pt-1 relative items-center",
+                        caption_label: "text-sm font-medium text-gray-900",
+                        nav: "space-x-1 flex items-center",
+                        nav_button:
+                          "h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100 hover:bg-gray-100 rounded-md transition-colors",
+                        nav_button_previous: "absolute left-1",
+                        nav_button_next: "absolute right-1",
+                        table: "w-full border-collapse space-y-1",
+                        head_row: "flex",
+                        head_cell:
+                          "text-gray-500 rounded-md w-9 font-normal text-[0.8rem]",
+                        row: "flex w-full mt-2",
+                        cell: "text-center text-sm p-0 relative [&:has([aria-selected])]:bg-gray-100 first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md focus-within:relative focus-within:z-20",
+                        day: "h-9 w-9 p-0 font-normal aria-selected:opacity-100 hover:bg-gray-100 rounded-md transition-colors",
+                        day_selected:
+                          "bg-black text-white hover:bg-black hover:text-white focus:bg-black focus:text-white",
+                        day_today: "bg-gray-100 text-gray-900 font-medium",
+                        day_outside: "text-gray-400 opacity-50",
+                        day_disabled: "text-gray-400 opacity-50",
+                        day_range_middle:
+                          "aria-selected:bg-gray-100 aria-selected:text-gray-900",
+                        day_hidden: "invisible",
+                      }}
+                    />
+                  </CardContent>
+                </Card>
+              </div>
 
-              <div className="space-y-6">
+              <div className="lg:col-span-2 space-y-6">
                 <Card className="border-gray-200 shadow-sm">
                   <CardHeader className="pb-4">
                     <CardTitle className="flex items-center gap-2 text-gray-900">
@@ -259,22 +559,53 @@ export default function TimeManagementPage() {
                         <DateDisplay date={selectedDate} />
                       </div>
                     )}
-                    <div className="flex gap-3">
-                      <Input
-                        value={task}
-                        onChange={(e) => setTask(e.target.value)}
-                        onKeyPress={handleKeyPress}
-                        placeholder="Add a task for selected date..."
-                        className="flex-1 border-gray-200 focus:border-gray-400 transition-colors"
-                        disabled={!selectedDate}
-                      />
+                    <div className="space-y-4">
+                      <div>
+                        <Label
+                          htmlFor="task-title"
+                          className="text-sm text-gray-700 mb-2 block"
+                        >
+                          Task Title
+                        </Label>
+                        <Input
+                          id="task-title"
+                          value={taskText}
+                          onChange={(e) => setTaskText(e.target.value)}
+                          onKeyPress={handleKeyPress}
+                          placeholder="What needs to be done?"
+                          className="border-gray-200 focus:border-gray-400 transition-colors"
+                          disabled={!selectedDate || isLoading}
+                        />
+                      </div>
+                      <div>
+                        <Label
+                          htmlFor="task-details"
+                          className="text-sm text-gray-700 mb-2 block"
+                        >
+                          Details (optional)
+                        </Label>
+                        <Textarea
+                          id="task-details"
+                          value={taskData}
+                          onChange={(e) => setTaskData(e.target.value)}
+                          placeholder="Add more details about this task..."
+                          className="min-h-[80px] border-gray-200 focus:border-gray-400 transition-colors"
+                          disabled={!selectedDate || isLoading}
+                        />
+                      </div>
                       <Button
                         onClick={handleAddTask}
-                        className="bg-black hover:bg-gray-800 text-white px-6 transition-all duration-200 hover:shadow-md"
-                        disabled={!task.trim() || !selectedDate}
+                        className="w-full bg-black hover:bg-gray-800 text-white transition-all duration-200 hover:shadow-md"
+                        disabled={
+                          !taskText.trim() || !selectedDate || isLoading
+                        }
                       >
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add
+                        {isLoading ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Plus className="h-4 w-4 mr-2" />
+                        )}
+                        Add Task
                       </Button>
                     </div>
                     {!selectedDate && (
@@ -319,6 +650,8 @@ export default function TimeManagementPage() {
                       tasks={selectedDateTasks}
                       onToggle={handleToggleTask}
                       onDelete={handleDeleteTask}
+                      onEdit={handleEditTask}
+                      isLoading={isLoading && tasks.length === 0}
                     />
 
                     {totalCount > 0 && (

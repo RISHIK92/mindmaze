@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { auth } from "@/lib/firebase";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -14,6 +15,8 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Trash2, Plus, CheckCircle2, Circle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { BACKEND_URL } from "@/app/config";
+import { onAuthStateChanged } from "firebase/auth";
 
 function TodoItem({ todo, onToggle, onDelete }) {
   return (
@@ -21,14 +24,14 @@ function TodoItem({ todo, onToggle, onDelete }) {
       className={cn(
         "group flex items-center gap-3 p-4 rounded-lg border transition-all duration-200 hover:shadow-md",
         "bg-white border-gray-200 hover:border-gray-300",
-        todo.completed && "bg-gray-50 border-gray-100"
+        todo.status && "bg-gray-50 border-gray-100"
       )}
     >
       <button
-        onClick={() => onToggle(todo.id)}
+        onClick={() => onToggle(todo.id, !todo.status)}
         className="flex-shrink-0 transition-all duration-200 hover:scale-110"
       >
-        {todo.completed ? (
+        {todo.status ? (
           <CheckCircle2 className="h-5 w-5 text-black" />
         ) : (
           <Circle className="h-5 w-5 text-gray-400 hover:text-gray-600" />
@@ -38,10 +41,10 @@ function TodoItem({ todo, onToggle, onDelete }) {
       <span
         className={cn(
           "flex-1 text-sm font-medium transition-all duration-200",
-          todo.completed ? "line-through text-gray-400" : "text-gray-900"
+          todo.status ? "line-through text-gray-400" : "text-gray-900"
         )}
       >
-        {todo.text}
+        {todo.todo}
       </span>
 
       <button
@@ -69,9 +72,9 @@ function TodoList({ todos, onToggle, onDelete }) {
 
   return (
     <div className="space-y-3">
-      {todos.map((todo) => (
+      {todos.map((todo, id) => (
         <TodoItem
-          key={todo.id}
+          key={todo.id ?? id}
           todo={todo}
           onToggle={onToggle}
           onDelete={onDelete}
@@ -81,22 +84,73 @@ function TodoList({ todos, onToggle, onDelete }) {
   );
 }
 
+async function getIdToken() {
+  const user = auth.currentUser;
+  if (!user) return null;
+  return await user.getIdToken();
+}
+
 export default function TodosPage() {
   const [todos, setTodos] = useState([]);
   const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleAddTodo = () => {
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        setTodos([]);
+        return;
+      }
+
+      try {
+        const idToken = await user.getIdToken();
+        const res = await fetch(`${BACKEND_URL}/todos`, {
+          headers: {
+            Authorization: `Bearer ${idToken}`,
+          },
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          // Ensure data is an array
+          setTodos(Array.isArray(data) ? data : []);
+        } else {
+          setTodos([]);
+        }
+      } catch (error) {
+        console.error("Error fetching todos:", error);
+        setTodos([]);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  const handleAddTodo = async () => {
     if (input.trim() === "") return;
+    setLoading(true);
+    try {
+      const idToken = await getIdToken();
+      if (!idToken) return;
+      const res = await fetch(`${BACKEND_URL}/todos`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ todo: input.trim(), status: false }),
+      });
 
-    const newTodo = {
-      id: Date.now().toString(),
-      text: input.trim(),
-      completed: false,
-      createdAt: new Date(),
-    };
-
-    setTodos([newTodo, ...todos]);
-    setInput("");
+      if (res.ok) {
+        const newTodo = await res.json();
+        setTodos((prev) => [newTodo, ...prev]);
+        setInput("");
+      }
+    } catch (error) {
+      console.error("Error adding todo:", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleKeyPress = (e) => {
@@ -105,20 +159,59 @@ export default function TodosPage() {
     }
   };
 
-  const handleToggleTodo = (id) => {
-    setTodos((prev) =>
-      prev.map((todo) =>
-        todo.id === id ? { ...todo, completed: !todo.completed } : todo
-      )
-    );
+  // Toggle todo status
+  const handleToggleTodo = async (id, newStatus) => {
+    const todo = todos.find((t) => t.id === id);
+    if (!todo) return;
+
+    try {
+      const idToken = await getIdToken();
+      if (!idToken) return;
+
+      const res = await fetch(`${BACKEND_URL}/todos/${id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ todo: todo.todo, status: newStatus }),
+      });
+
+      if (res.ok) {
+        setTodos((prev) =>
+          prev.map((t) => (t.id === id ? { ...t, status: newStatus } : t))
+        );
+      }
+    } catch (error) {
+      console.error("Error toggling todo:", error);
+    }
   };
 
-  const handleDeleteTodo = (id) => {
-    setTodos((prev) => prev.filter((todo) => todo.id !== id));
+  // Delete todo
+  const handleDeleteTodo = async (id) => {
+    try {
+      const idToken = await getIdToken();
+      if (!idToken) return;
+
+      const res = await fetch(`${BACKEND_URL}/todos/${id}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${idToken}`,
+        },
+      });
+
+      if (res.ok) {
+        setTodos((prev) => prev.filter((t) => t.id !== id));
+      }
+    } catch (error) {
+      console.error("Error deleting todo:", error);
+    }
   };
 
-  const completedCount = todos.filter((todo) => todo.completed).length;
-  const totalCount = todos.length;
+  // Ensure todos is always an array before using filter
+  const todosArray = Array.isArray(todos) ? todos : [];
+  const completedCount = todosArray.filter((todo) => todo.status).length;
+  const totalCount = todosArray.length;
 
   return (
     <SidebarProvider>
@@ -167,7 +260,7 @@ export default function TodosPage() {
                     <Button
                       onClick={handleAddTodo}
                       className="bg-black hover:bg-gray-800 text-white px-6 transition-all duration-200 hover:shadow-md"
-                      disabled={!input.trim()}
+                      disabled={!input.trim() || loading}
                     >
                       <Plus className="h-4 w-4 mr-2" />
                       Add
@@ -179,7 +272,7 @@ export default function TodosPage() {
 
             <div className="space-y-4">
               <TodoList
-                todos={todos}
+                todos={todosArray}
                 onToggle={handleToggleTodo}
                 onDelete={handleDeleteTodo}
               />
